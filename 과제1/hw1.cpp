@@ -4,8 +4,6 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define MAX_REPEAT 30 //초기 클러스터 반복 가능 단계 수
-
 typedef struct Point //(x,y)
 {
     double x;
@@ -24,12 +22,13 @@ typedef struct CenterPoint //중심점
     int ci_p_count;
 } CENTERPOINT;
 
-void PrintCenterPoint(CENTERPOINT *centers, int k, int repeat)
+void PrintCenterPoint(CENTERPOINT *centers, int k)
 {
     for (int i = 0; i < k; i++)
-        printf("\t클러스터 %d: 중심점 = (%f, %f)\n", i, centers[k * repeat + i].p.x, centers[k * repeat + i].p.y);
+        printf("\t클러스터 %d: 중심점 = (%f, %f)\n", i, centers[i].p.x, centers[i].p.y);
 }
 
+//두 점의 거리를 리턴하는 함수
 double Distance(POINT p1, POINT p2)
 {
     double distance, x_d, y_d;
@@ -39,6 +38,7 @@ double Distance(POINT p1, POINT p2)
     return distance;
 }
 
+// 모든 중심점과 비교하여 가장 짧은 거리를 리턴하는 함수
 double ShortDistance(POINT p, CENTERPOINT *centers, int center_count)
 {
     double short_distance, distance;
@@ -52,25 +52,27 @@ double ShortDistance(POINT p, CENTERPOINT *centers, int center_count)
     return short_distance;
 }
 
-int ShortDistanceIdx(POINT p, CENTERPOINT *centers, int k, int repeat)
+// 모든 중심점과 비교하여 가장 가까운 중심점의 인덱스를 리턴하는 함수
+int ShortDistanceIdx(POINT p, CENTERPOINT *centers, int k)
 {
     int short_idx = 0;
     for (int i = 1; i < k; i++)
     {
-        if (Distance(p, centers[k * repeat + i].p) < Distance(p, centers[k * repeat + short_idx].p))
+        if (Distance(p, centers[i].p) < Distance(p, centers[short_idx].p))
             short_idx = i;
     }
     return short_idx;
 }
 
-double LongDistance(CENTERPOINT *centers, CLUSTER *points, int k, int point_count, int repeat, int ci)
+// 군집 내의 점들 중 중심점과의 거리가 가장 긴 거리를 리턴
+double LongDistance(CENTERPOINT *centers, CLUSTER *points, int point_count, int ci)
 {
     double long_distance = -1, distance;
     for (int i = 0; i < point_count; i++)
     {
         if (points[i].ci == ci)
         {
-            distance = Distance(points[i].p, centers[k * repeat + ci].p);
+            distance = Distance(points[i].p, centers[ci].p);
             if (distance > long_distance)
                 long_distance = distance;
         }
@@ -78,6 +80,7 @@ double LongDistance(CENTERPOINT *centers, CLUSTER *points, int k, int point_coun
     return long_distance;
 }
 
+// 초기 중심점 설정 함수
 void AllocFirstCenter(CENTERPOINT *centers, CLUSTER *points, int k, int point_count)
 {
     int max_idx;
@@ -108,62 +111,78 @@ void AllocFirstCenter(CENTERPOINT *centers, CLUSTER *points, int k, int point_co
     }
 }
 
-void AllocCenter(CLUSTER *points, CENTERPOINT *centers, int k, int point_count, int repeat)
+// 중심점 설정 함수
+void AllocCenter(CLUSTER *points, CENTERPOINT *centers, CENTERPOINT *centers_before, int k, int point_count)
 {
     for (int i = 0; i < point_count; i++)
     {
-        centers[k * repeat + points[i].ci].p.x += points[i].p.x;
-        centers[k * repeat + points[i].ci].p.y += points[i].p.y;
+        centers[points[i].ci].p.x += points[i].p.x;
+        centers[points[i].ci].p.y += points[i].p.y;
     }
     for (int i = 0; i < k; i++)
     {
-        centers[k * repeat + i].p.x /= centers[k * (repeat - 1) + i].ci_p_count;
-        centers[k * repeat + i].p.y /= centers[k * (repeat - 1) + i].ci_p_count;
+        centers[i].p.x /= centers_before[i].ci_p_count;
+        centers[i].p.y /= centers_before[i].ci_p_count;
     }
 }
 
-void AllocCluster(CLUSTER *points, CENTERPOINT *centers, int k, int point_count, int repeat)
+// 클러스터의 번호를 배정하는 함수
+void AllocCluster(CLUSTER *points, CENTERPOINT *centers, int k, int point_count)
 {
     for (int i = 0; i < point_count; i++)
     {
-        points[i].ci = ShortDistanceIdx(points[i].p, centers, k, repeat);
-        // centers[k * repeat + i].ci_p_count++; // Ci에 속하는 점들의 개수 추가
-        centers[k * repeat + points[i].ci].ci_p_count++; // Ci에 속하는 점들의 개수 추가
+        points[i].ci = ShortDistanceIdx(points[i].p, centers, k);
+        centers[points[i].ci].ci_p_count++; // Ci에 속하는 점들의 개수 추가
     }
 }
 
-void PrintLastCluster(CENTERPOINT *centers, CLUSTER *points, int k, int point_count, int repeat)
+// 마지막 클러스터 출력 함수
+void PrintLastCluster(CENTERPOINT *centers, CENTERPOINT *centers_before, CLUSTER *points, int k, int point_count)
 {
     double long_distance;
-    printf("### 클러스터 구성 완료!! : 반복횟수 = %d\n", repeat);
     for (int i = 0; i < k; i++)
     {
-        long_distance = LongDistance(centers, points, k, point_count, repeat, i);
+        long_distance = LongDistance(centers, points, point_count, i);
         printf("\t클러스터 %d: 중심점 = (%f, %f), point 수 = %d, 최장 거리 = %f\n", i,
-               centers[k * repeat + i].p.x, centers[k * repeat + i].p.y,
-               centers[k * (repeat - 1) + i].ci_p_count, long_distance);
+               centers[i].p.x, centers[i].p.y, centers_before[i].ci_p_count, long_distance);
     }
 }
 
-bool SameCenter(CENTERPOINT *center, int k, int repeat)
+// 중심점이 이전 중심점과 같은지 비교하는 함수
+bool SameCenter(CENTERPOINT *centers, CENTERPOINT *centers_before, int k)
 {
     for (int i = 0; i < k; i++)
     {
-        if (center[k * repeat + i].p.x == center[k * (repeat - 1) + i].p.x && center[k * repeat + i].p.y == center[k * (repeat - 1) + i].p.y)
+        if (centers[i].p.x == centers_before[i].p.x && centers[i].p.y == centers_before[i].p.y)
             continue;
         else
-            return false;
+            return false; //중심점이 다르다
     }
-    return true;
+    return true; //중심점이 같다
 }
 
+// centers_before은 center으로 복사, centers는 0으로 초기화하는 함수
+void SetCenters(CENTERPOINT *centers, CENTERPOINT *centers_before, int k)
+{
+    for (int i = 0; i < k; i++)
+    {
+        centers_before[i].p = centers[i].p;
+        centers_before[i].ci_p_count = centers[i].ci_p_count;
+
+        centers[i].p.x = 0;
+        centers[i].p.y = 0;
+        centers[i].ci_p_count = 0;
+    }
+}
+
+// K-Means 알고리즘 실행 함수
 void RunKMeans()
 {
     FILE *file = NULL;
     char file_name[16];
     int k, point_count, repeat_count = 0;
-    CLUSTER *points = NULL;      //점들
-    CENTERPOINT *centers = NULL; //중심점들
+    CLUSTER *points = NULL;                              //점들
+    CENTERPOINT *centers = NULL, *centers_before = NULL; //중심점들
 
     printf("파일 이름과 K 값을 입력하시오 >> ");
     scanf("%s %d", file_name, &k);
@@ -180,29 +199,34 @@ void RunKMeans()
     for (int i = 0; i < point_count; i++)
         fscanf(file, "%lf %lf", &points[i].p.x, &points[i].p.y);
 
-    centers = (CENTERPOINT *)calloc(MAX_REPEAT * k, sizeof(CENTERPOINT)); // 0으로 초기화
+    centers = (CENTERPOINT *)calloc(k, sizeof(CENTERPOINT));        // 0으로 초기화
+    centers_before = (CENTERPOINT *)calloc(k, sizeof(CENTERPOINT)); // 0으로 초기화
 
     AllocFirstCenter(centers, points, k, point_count);
-    AllocCluster(points, centers, k, point_count, repeat_count);
+    AllocCluster(points, centers, k, point_count);
     printf("초기 클러스터 구성 : \n");
-    PrintCenterPoint(centers, k, 0);
+    PrintCenterPoint(centers, k);
 
     while (1) //반복횟수 2회 이상
     {
         repeat_count++;
-        AllocCenter(points, centers, k, point_count, repeat_count);
-        if (SameCenter(centers, k, repeat_count))
+
+        SetCenters(centers, centers_before, k);
+        AllocCenter(points, centers, centers_before, k, point_count);
+        if (SameCenter(centers, centers_before, k))
         {
-            PrintLastCluster(centers, points, k, point_count, repeat_count);
+            printf("### 클러스터 구성 완료!! : 반복횟수 = %d\n", repeat_count);
+            PrintLastCluster(centers, centers_before, points, k, point_count);
             break;
         }
-        AllocCluster(points, centers, k, point_count, repeat_count);
+        AllocCluster(points, centers, k, point_count);
         printf("%d번째 클러스터 구성 : \n", repeat_count + 1);
-        PrintCenterPoint(centers, k, repeat_count);
+        PrintCenterPoint(centers, k);
     }
 
     free(points);
     free(centers);
+    free(centers_before);
 }
 
 int main(void)
