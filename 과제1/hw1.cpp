@@ -180,7 +180,7 @@ void RunKMeans()
 {
     FILE *file = NULL;
     char file_name[16];
-    int k, point_count, repeat_count = 0;
+    int k, point_count, repeat_count = 1;
     CLUSTER *points = NULL;                              //점들
     CENTERPOINT *centers = NULL, *centers_before = NULL; //중심점들
 
@@ -193,11 +193,13 @@ void RunKMeans()
         printf("파일 열 수 없음\n");
         return; //프로그램 종료
     }
+
     // points 배열에 파일에서 읽어온 점들의 (x,y)좌표를 저장한다.
     fscanf(file, "%d", &point_count);
     points = (CLUSTER *)malloc(point_count * sizeof(CLUSTER));
     for (int i = 0; i < point_count; i++)
         fscanf(file, "%lf %lf", &points[i].p.x, &points[i].p.y);
+    fclose(file);
 
     centers = (CENTERPOINT *)calloc(k, sizeof(CENTERPOINT));        // 0으로 초기화
     centers_before = (CENTERPOINT *)calloc(k, sizeof(CENTERPOINT)); // 0으로 초기화
@@ -215,12 +217,12 @@ void RunKMeans()
         AllocCenter(points, centers, centers_before, k, point_count);
         if (SameCenter(centers, centers_before, k))
         {
-            printf("### 클러스터 구성 완료!! : 반복횟수 = %d\n", repeat_count);
+            printf("### 클러스터 구성 완료!! : 반복횟수 = %d\n", repeat_count - 1);
             PrintLastCluster(centers, centers_before, points, k, point_count);
             break;
         }
         AllocCluster(points, centers, k, point_count);
-        printf("%d번째 클러스터 구성 : \n", repeat_count + 1);
+        printf("%d번째 클러스터 구성 : \n", repeat_count);
         PrintCenterPoint(centers, k);
     }
 
@@ -231,7 +233,7 @@ void RunKMeans()
 
 int main(void)
 {
-    RunKMeans();
+    RunKMeans(); // haha
 
     return 0;
 }
